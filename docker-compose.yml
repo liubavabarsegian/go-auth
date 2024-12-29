@@ -2,36 +2,50 @@ version: '3.7'
 
 services:
   keycloak:
-    container_name: docker_keycloak
+    container_name: keycloak
     image: quay.io/keycloak/keycloak:23.0.6
-    command: start
+    command: start-dev --import-realm
     environment:
-      KC_HOSTNAME: localhost
-      KC_HOSTNAME_PORT: 8080
-      KC_HOSTNAME_STRICT_BACKCHANNEL: true
+      KC_HOSTNAME: keycloak
+      KC_HOSTNAME_STRICT_HTTPS: false
       KC_HTTP_ENABLED: true
       KC_HEALTH_ENABLED: true
-      KC_LOG_LEVEL: info
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_CACHE: local
     ports:
-      - 8080:8080
+      - "8080:8080"
     restart: always
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
+      test: ["CMD", "/opt/keycloak/bin/kc.sh", "show-config"]
       interval: 15s
-      timeout: 2s
-      retries: 15
+      timeout: 10s
+      retries: 10
     volumes:
       - ./realm.json:/opt/keycloak/data/import/realm.json:ro
-  
+    networks:
+      - go-auth-network
+
   auth_service:
-    build: ./auth_service
-    container_name: go_auth_container
+    build:
+      context: ./auth_service
+      dockerfile: Dockerfile
+    container_name: go_auth
     environment:
       - GO_ENV=dev
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=master
+      - KEYCLOAK_CLIENT_ID=auth-service
+      - KEYCLOAK_CLIENT_SECRET=my-client-secret
     ports:
       - "8081:8081"
     restart: always
     depends_on:
-      - keycloak
+      keycloak:
+        condition: service_healthy
+    networks:
+      - go-auth-network
+
+networks:
+  go-auth-network:
+    driver: bridge

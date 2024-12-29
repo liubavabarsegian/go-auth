@@ -14,7 +14,7 @@
 
 # Переменные
 DOCKER_COMPOSE = docker-compose
-PROJECT_NAME = auth_service
+PROJECT_NAME = go_auth
 
 # Задачи
 .PHONY: all build up down restart logs keycloak-logs go-logs
@@ -35,7 +35,7 @@ down:
 	$(DOCKER_COMPOSE) -p $(PROJECT_NAME) down
 
 # Перезапуск всех сервисов
-restart: down up
+restart: down all
 
 # Просмотр логов всех сервисов
 logs:
