@@ -1,11 +1,11 @@
 {
-  "realm": "master",
+  "realm": "auth-service-realm",
   "enabled": true,
   "users": [
     {
-      "username": "admin",
+      "username": "auth-admin",
       "enabled": true,
-      "email": "admin@master.com",
+      "email": "admin@auth-service-realm.com",
       "firstName": "Admin",
       "lastName": "User",
       "credentials": [
