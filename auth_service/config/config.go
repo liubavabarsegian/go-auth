@@ -1,6 +1,8 @@
 package config
 
-import "os"
+import (
+	"os"
+)
 
 var (
 	Realm        = os.Getenv("KEYCLOAK_REALM")
