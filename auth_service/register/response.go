@@ -1,7 +1,7 @@
 package register
 
 type registerResponse struct {
-	Status  uint8  `json:"status,omitempty"`
+	Status  int    `json:"status,omitempty"`
 	Message string `json:"message,omitempty"`
 }
 

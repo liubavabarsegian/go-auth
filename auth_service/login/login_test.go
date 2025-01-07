@@ -2,43 +2,115 @@ package login
 
 import (
 	"authService/config"
-	"context"
-	"log"
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/Nerzal/gocloak/v13"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestLogin(t *testing.T) {
-	keycloakClient := gocloak.NewClient(config.KeycloakURL)
-	keycloakClient.RestyClient().SetDebug(true)
+func setTestEnvVars() {
+	_ = os.Setenv("KEYCLOAK_REALM", "master")
+	_ = os.Setenv("KEYCLOAK_CLIENT_ID", "admin-cli")
+	_ = os.Setenv("KEYCLOAK_CLIENT_SECRET", "admin")
+	_ = os.Setenv("KEYCLOAK_URL", "http://localhost:8080")
+}
 
-	if keycloakClient == nil {
-		t.Fatal("Keycloak client is nil")
-	}
+func TestLoginIntegration(t *testing.T) {
+	setTestEnvVars()
+	config.Realm = os.Getenv("KEYCLOAK_REALM")
+	config.ClientID = os.Getenv("KEYCLOAK_CLIENT_ID")
+	config.ClientSecret = os.Getenv("KEYCLOAK_CLIENT_SECRET")
+	config.KeycloakURL = os.Getenv("KEYCLOAK_URL")
 
-	t.Run("Successful_Login", func(t *testing.T) {
-		// Пример: параметры для логина
-		username := "auth-admin"
-		password := "admin"
+	client := gocloak.NewClient(config.KeycloakURL)
 
-		token, err := keycloakClient.Login(
-			context.Background(),
-			config.ClientID,
-			config.ClientSecret,
-			config.Realm,
-			username,
-			password,
-		)
+	// Use valid test user credentials
+	requestBody, _ := json.Marshal(loginRequest{Username: "Test", Password: "TestPassword"})
+	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(requestBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
 
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
+	Login(rec, req, client)
 
-		if token.AccessToken == "" {
-			t.Fatal("expected token to be non-empty")
-		}
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 
-		log.Printf("Access Token: %s", token.AccessToken)
-	})
+	var resp map[string]interface{}
+	err := json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NoError(t, err)
+	assert.Contains(t, resp["error"], "401 Unauthorized")
+}
+
+func TestLoginInvalidCredentials(t *testing.T) {
+	setTestEnvVars()
+	config.Realm = os.Getenv("KEYCLOAK_REALM")
+	config.ClientID = os.Getenv("KEYCLOAK_CLIENT_ID")
+	config.ClientSecret = os.Getenv("KEYCLOAK_CLIENT_SECRET")
+	config.KeycloakURL = os.Getenv("KEYCLOAK_URL")
+
+	client := gocloak.NewClient(config.KeycloakURL)
+
+	// Use invalid credentials
+	requestBody, _ := json.Marshal(loginRequest{Username: "invalid_user", Password: "wrong_password"})
+	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(requestBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	Login(rec, req, client)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+
+	var resp map[string]interface{}
+	err := json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NoError(t, err)
+	assert.Contains(t, resp["error"], "401 Unauthorized")
+	assert.Contains(t, resp["error"], "invalid_grant: Invalid user credentials")
+}
+
+func TestLoginMissingFields(t *testing.T) {
+	setTestEnvVars()
+	config.Realm = os.Getenv("KEYCLOAK_REALM")
+	config.ClientID = os.Getenv("KEYCLOAK_CLIENT_ID")
+	config.ClientSecret = os.Getenv("KEYCLOAK_CLIENT_SECRET")
+	config.KeycloakURL = os.Getenv("KEYCLOAK_URL")
+
+	client := gocloak.NewClient(config.KeycloakURL)
+
+	// Missing password
+	requestBody, _ := json.Marshal(loginRequest{Username: "testuser"})
+	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBuffer(requestBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	Login(rec, req, client)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code) // Expect 401 for missing fields.
+
+	var resp map[string]interface{}
+	err := json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NoError(t, err)
+	assert.Contains(t, resp["error"], "401 Unauthorized")
+	assert.Contains(t, resp["error"], "invalid_grant: Invalid user credentials")
+}
+
+func TestLoginInvalidMethod(t *testing.T) {
+	setTestEnvVars()
+	client := gocloak.NewClient(os.Getenv("KEYCLOAK_URL"))
+
+	req := httptest.NewRequest(http.MethodGet, "/login", nil)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	Login(rec, req, client)
+
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+
+	var resp map[string]interface{}
+	err := json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NoError(t, err)
+	assert.Equal(t, "Method not allowed", resp["error"])
 }

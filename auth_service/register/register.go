@@ -18,7 +18,6 @@ func Register(w http.ResponseWriter, r *http.Request, keycloakClient *gocloak.Go
 	}
 
 	var req RegisterRequest
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(registerErrorResponse{Status: http.StatusBadRequest, Error: err.Error()})
@@ -28,7 +27,7 @@ func Register(w http.ResponseWriter, r *http.Request, keycloakClient *gocloak.Go
 	token, err := keycloakClient.LoginAdmin(r.Context(), "admin", "admin", "master")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(registerErrorResponse{Status: http.StatusInternalServerError, Error: "Method not allowed"})
+		json.NewEncoder(w).Encode(registerErrorResponse{Status: http.StatusInternalServerError, Error: "Failed to login admin: " + err.Error()})
 		return
 	}
 
@@ -48,7 +47,7 @@ func Register(w http.ResponseWriter, r *http.Request, keycloakClient *gocloak.Go
 	_, err = keycloakClient.CreateUser(r.Context(), token.AccessToken, config.Realm, user)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(registerErrorResponse{Status: http.StatusInternalServerError, Error: err.Error()})
+		json.NewEncoder(w).Encode(registerErrorResponse{Status: http.StatusInternalServerError, Error: "Failed to create user: " + err.Error()})
 		return
 	}
 

@@ -24,17 +24,17 @@ func Logout(w http.ResponseWriter, r *http.Request, keycloakClient *gocloak.GoCl
 		return
 	}
 
-	// token, err := keycloakClient.LoginAdmin(r.Context(), "admin", "admin", "master")
-	// if err != nil {
-	// 	w.WriteHeader(http.StatusInternalServerError)
-	// 	json.NewEncoder(w).Encode(logoutErrorResponse{Status: http.StatusInternalServerError, Error: "Failed to get admin token"})
-	// 	return
-	// }
+	// Check realm value
+	if config.Realm == "" {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(logoutErrorResponse{Status: http.StatusInternalServerError, Error: "Realm not set"})
+		return
+	}
 
 	err := keycloakClient.Logout(r.Context(), config.ClientID, config.ClientSecret, config.Realm, request.RefreshToken)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(logoutErrorResponse{Status: http.StatusInternalServerError, Error: "Failed to logout user"})
+		json.NewEncoder(w).Encode(logoutErrorResponse{Status: http.StatusInternalServerError, Error: "Failed to logout user: " + err.Error()})
 		return
 	}
 
